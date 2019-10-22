@@ -1,0 +1,37 @@
+{
+  "name": "outlook-to-telegram",
+  "version": "1.0.0",
+  "description": "Script for forwarding outlook mail to the telegram channel",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "debug": "ts-node index.ts"
+  },
+  "author": "Egor Makarenko",
+  "license": "MIT",
+  "dependencies": {
+    "@microsoft/microsoft-graph-client": "^2.0.0",
+    "axios": "^0.19.0",
+    "dotenv": "^8.2.0",
+    "es6-promise": "^4.2.8",
+    "inquirer": "^7.0.0",
+    "isomorphic-fetch": "^2.2.1",
+    "ora": "^4.0.2",
+    "qs": "^6.9.0"
+  },
+  "devDependencies": {
+    "@microsoft/microsoft-graph-types": "^1.11.0",
+    "@types/inquirer": "^6.5.0",
+    "@types/qs": "^6.5.3",
+    "@typescript-eslint/eslint-plugin": "^2.5.0",
+    "@typescript-eslint/parser": "^2.5.0",
+    "eslint": "^6.5.1",
+    "eslint-config-standard": "^14.1.0",
+    "eslint-plugin-import": "^2.18.2",
+    "eslint-plugin-node": "^10.0.0",
+    "eslint-plugin-promise": "^4.2.1",
+    "eslint-plugin-standard": "^4.0.1",
+    "ts-node": "^8.4.1",
+    "typescript": "^3.6.4"
+  }
+}
