@@ -1,111 +1,127 @@
-/* eslint-disable @typescript-eslint/camelcase */
-import axios from 'axios'
-import qs from 'qs'
+#!/usr/bin/env node
+
 import inquirer from 'inquirer'
-import ora from 'ora'
-import { config } from 'dotenv'
+import TurndownService from 'turndown'
+import * as dotenv from 'dotenv'
+import Telegraf from 'telegraf'
+import ProxyAgent from 'proxy-agent'
 import 'isomorphic-fetch'
+import { AppData, AuthProvider } from './auth-provider'
 import { MailFolder, Message, User } from '@microsoft/microsoft-graph-types'
-import { Client, AuthenticationProvider } from '@microsoft/microsoft-graph-client'
+import { Client } from '@microsoft/microsoft-graph-client'
+import { Agent } from 'https'
+import Conf from 'conf'
 
-config()
+dotenv.config()
 
-const app = {
-  id: process.env.APP_ID,
-  secret: process.env.APP_SECRET,
+const config = new Conf()
+
+const app: AppData = {
+  id: process.env.APP_ID || '',
+  secret: process.env.APP_SECRET || '',
   tenant: process.env.TENANT || 'common',
   scope: 'offline_access user.read mail.read'
-}
-
-class AuthProvider implements AuthenticationProvider {
-  private token: string | null = null;
-
-  private expire: number | null = Date.now();
-
-  public constructor () {
-    // Read saved token
-  }
-
-  public setToken (token: string): void {
-    this.token = token
-  }
-
-  public async initDeviceCodeFlow (): Promise<any> {
-    const url = `https://login.microsoftonline.com/${app.tenant}/oauth2/v2.0/devicecode`
-    const { data } = await axios.get(url, {
-      params: {
-        client_id: app.id,
-        scope: app.scope
-      },
-      validateStatus: status => status >= 200 && status < 500
-    })
-    return data
-  }
-
-  public async pollToken (code: string): Promise<any> {
-    const url = `https://login.microsoftonline.com/${app.tenant}/oauth2/v2.0/token`
-    const { data } = await axios.post(url, qs.stringify({
-      grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
-      client_id: app.id,
-      device_code: code
-    }), {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      validateStatus: status => status >= 200 && status < 500
-    })
-    return data
-  }
-
-  private updateToken () {
-    // TODO
-  }
-
-  /**
-   * This method will get called before every request to the msgraph server
-   * This should return a Promise that resolves to an accessToken
-   * (in case of success) or rejects with error (in case of failure)
-   * Basically this method will contain the implementation for getting and
-   * refreshing accessTokens
-   */
-  public async getAccessToken (): Promise<string> {
-    return this.token || ''
-  }
-}
+};
 
 (async (): Promise<void> => {
-  const authProvider = new AuthProvider()
+  const authProvider: AuthProvider = new AuthProvider(app)
+  const client: Client = Client.initWithMiddleware({ authProvider })
 
-  const deviceData = await authProvider.initDeviceCodeFlow()
-  console.log(deviceData.message)
-  const spinner = ora('Waiting for authorization...').start()
-  let tokenData = await authProvider.pollToken(deviceData.device_code)
-  while (!tokenData.access_token) {
-    await new Promise((resolve, reject) => { setTimeout(resolve, deviceData.interval * 1000) })
-    tokenData = await authProvider.pollToken(deviceData.device_code)
-  }
-  spinner.stop()
-
-  authProvider.setToken(tokenData.access_token)
-
-  const client = Client.initWithMiddleware({ authProvider })
+  const proxy = process.env.PROXY_URL
+  const bot = new Telegraf(process.env.BOT_TOKEN || 'NO_TOKEN', {
+    telegram: {
+      agent: proxy ? new ProxyAgent(proxy) as unknown as Agent : undefined
+    }
+  })
 
   const me: User = await client.api('/me').get()
   console.log(`Authorized as ${me.displayName} (${me.mail})`)
 
-  const mailFolders: { value: MailFolder[] } = await client.api('/me/mailFolders').get()
+  let folderId = config.get('folderId')
+  let chatId = config.get('chatId')
+  let filterEmail = config.get('filterEmail')
 
-  const { folderId } = await inquirer.prompt([
-    {
-      type: 'list',
-      name: 'folderId',
-      message: 'Please select the folder to forward:',
-      choices: mailFolders.value.map(folder => ({
-        name: `${folder.displayName} (${folder.unreadItemCount}/${folder.totalItemCount})`,
-        value: folder.id
-      }))
+  if (!folderId || !chatId || !filterEmail) {
+    const mailFolders: { value: MailFolder[] } = await client.api('/me/mailFolders').get()
+
+    const answers = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'folderId',
+        message: 'Please select the folder to forward:',
+        choices: mailFolders.value.map(folder => ({
+          name: `${folder.displayName} (${folder.unreadItemCount}/${folder.totalItemCount})`,
+          value: folder.id
+        })),
+        default: config.get('folderId')
+      },
+      {
+        type: 'input',
+        name: 'chatId',
+        message: 'Please input @channelname or chat id:',
+        default: config.get('chatId')
+      },
+      {
+        type: 'input',
+        name: 'filterEmail',
+        message: 'Please input email to get messages for:',
+        default: config.get('filterEmail')
+      }
+    ])
+
+    folderId = answers.folderId
+    chatId = answers.chatId
+    filterEmail = answers.filterEmail
+
+    if (chatId.match(/^@/)) {
+      chatId = (await bot.telegram.getChat(chatId)).id
     }
-  ])
 
-  const mail: { value: Message[] } = await client.api(`/me/mailFolders/${folderId}/messages/delta?$top=10`).get()
+    config.set('folderId', folderId)
+    config.set('chatId', chatId)
+    config.set('filterEmail', filterEmail)
+  }
 
-  console.log(mail.value.map(m => m.subject))
-})().catch(error => console.error(`Error: ${error}`))
+  const link = config.get('deltaLink') || `/me/mailFolders/${folderId}/messages/delta?$top=10`
+
+  const mail: {
+    value: Message[];
+    '@odata.nextLink'?: string;
+    '@odata.deltaLink'?: string;
+  } =
+    await client.api(link).get()
+
+  config.set('deltaLink', mail['@odata.nextLink'] || mail['@odata.deltaLink'])
+
+  const turndownService = new TurndownService()
+
+  const messages = mail.value.filter(m => {
+    const { toRecipients, ccRecipients, bccRecipients } = m
+    const recepients: string[] = (toRecipients || [])
+      .concat(ccRecipients || [])
+      .concat(bccRecipients || [])
+      .map(r => r.emailAddress || {})
+      .map(a => a.address || '')
+      .map(s => s.toLowerCase())
+    return recepients.includes(filterEmail.toLowerCase())
+  }).map(m => {
+    const { subject, body, hasAttachments } = m
+    const content: string = body ? body.content || '' : ''
+
+    return {
+      subject: subject,
+      body: turndownService.turndown(content)
+        .replace(/^\s+/, '')
+        .replace(/\s+$/, '')
+        .replace(/\s*\n\s*/g, '\n'),
+      attachments: hasAttachments || false
+    }
+  })
+
+  console.log(messages)
+
+  const channel = await bot.telegram.getChat(chatId)
+  messages.forEach(message => {
+    bot.telegram.sendMessage(channel.id, `# ${message.subject}\n\n${message.body}${message.attachments ? '\n\n(прикреплены файлы, но бот так пока не умеет 😕)' : ''}`, { parse_mode: 'Markdown' })
+  })
+})().catch(console.error)

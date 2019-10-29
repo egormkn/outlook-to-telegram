@@ -6,5 +6,9 @@
         "standard"
     ],
     "parser": "@typescript-eslint/parser",
-    "plugins": ["@typescript-eslint"]
+    "plugins": ["@typescript-eslint"],
+    "rules": {
+        "camelcase": "off",
+        "@typescript-eslint/camelcase": "off"
+    }
 }
