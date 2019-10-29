@@ -82,7 +82,7 @@ const app: AppData = {
     config.set('filterEmail', filterEmail)
   }
 
-  const link = config.get('deltaLink') || `/me/mailFolders/${folderId}/messages/delta?$top=10`
+  const link = config.get('deltaLink') || config.get('nextLink') || `/me/mailFolders/${folderId}/messages/delta?$top=10`
 
   const mail: {
     value: Message[];
@@ -91,7 +91,17 @@ const app: AppData = {
   } =
     await client.api(link).get()
 
-  config.set('deltaLink', mail['@odata.nextLink'] || mail['@odata.deltaLink'])
+  if (mail['@odata.deltaLink']) {
+    config.set('deltaLink', mail['@odata.deltaLink'])
+  } else {
+    config.delete('deltaLink')
+  }
+
+  if (mail['@odata.nextLink']) {
+    config.set('nextLink', mail['@odata.nextLink'])
+  } else {
+    config.delete('nextLink')
+  }
 
   const turndownService = new TurndownService()
 
@@ -118,10 +128,8 @@ const app: AppData = {
     }
   })
 
-  console.log(messages)
-
   const channel = await bot.telegram.getChat(chatId)
   messages.forEach(message => {
-    bot.telegram.sendMessage(channel.id, `# ${message.subject}\n\n${message.body}${message.attachments ? '\n\n(прикреплены файлы, но бот так пока не умеет 😕)' : ''}`, { parse_mode: 'Markdown' })
+    bot.telegram.sendMessage(channel.id, `*${message.subject}*\n\n${message.body}${message.attachments ? '\n\n(прикреплены файлы, но бот так пока не умеет 😕)' : ''}`, { parse_mode: 'Markdown' })
   })
 })().catch(console.error)
