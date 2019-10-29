@@ -34,5 +34,5 @@ Script that forwards outlook mail to the telegram channel
    
 6) Set the CRON job to start the script every 10 minutes:
    
-   `(crontab -l ; echo "*/10 * * * * (cd $(pwd) && npm run start)") | crontab -`
+   `(crontab -l ; echo "*/10 * * * * (cd $(pwd) && npm run start) >> $(pwd)/log.txt 2>&1") | crontab -`
    
