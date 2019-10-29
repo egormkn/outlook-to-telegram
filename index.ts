@@ -82,7 +82,7 @@ const app: AppData = {
     config.set('filterEmail', filterEmail)
   }
 
-  const link = config.get('deltaLink') || config.get('nextLink') || `/me/mailFolders/${folderId}/messages/delta?$top=10`
+  const link = config.get('deltaLink') || config.get('nextLink') || `/me/mailFolders/${folderId}/messages/delta?$top=10&$orderby=receivedDateTime+desc`
 
   const mail: {
     value: Message[];
@@ -90,6 +90,8 @@ const app: AppData = {
     '@odata.deltaLink'?: string;
   } =
     await client.api(link).get()
+
+  console.debug(mail.value)
 
   if (mail['@odata.deltaLink']) {
     config.set('deltaLink', mail['@odata.deltaLink'])
