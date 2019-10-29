@@ -3,7 +3,8 @@
 import inquirer from 'inquirer'
 import TurndownService from 'turndown'
 import * as dotenv from 'dotenv'
-import Telegraf from 'telegraf'
+import moment from 'moment'
+import { Telegram } from 'telegraf'
 import ProxyAgent from 'proxy-agent'
 import 'isomorphic-fetch'
 import { AppData, AuthProvider } from './auth-provider'
@@ -13,6 +14,8 @@ import { Agent } from 'https'
 import Conf from 'conf'
 
 dotenv.config()
+
+moment.locale('ru')
 
 const config = new Conf()
 
@@ -28,10 +31,8 @@ const app: AppData = {
   const client: Client = Client.initWithMiddleware({ authProvider })
 
   const proxy = process.env.PROXY_URL
-  const bot = new Telegraf(process.env.BOT_TOKEN || 'NO_TOKEN', {
-    telegram: {
-      agent: proxy ? new ProxyAgent(proxy) as unknown as Agent : undefined
-    }
+  const telegram = new Telegram(process.env.BOT_TOKEN || '', {
+    agent: proxy ? new ProxyAgent(proxy) as unknown as Agent : undefined
   })
 
   const me: User = await client.api('/me').get()
@@ -74,7 +75,7 @@ const app: AppData = {
     filterEmail = answers.filterEmail
 
     if (chatId.match(/^@/)) {
-      chatId = (await bot.telegram.getChat(chatId)).id
+      chatId = (await telegram.getChat(chatId)).id
     }
 
     config.set('folderId', folderId)
@@ -130,8 +131,8 @@ const app: AppData = {
     }
   })
 
-  const channel = await bot.telegram.getChat(chatId)
-  messages.forEach(message => {
-    bot.telegram.sendMessage(channel.id, `*${message.subject}*\n\n${message.body}${message.attachments ? '\n\n(прикреплены файлы, но бот так пока не умеет 😕)' : ''}`, { parse_mode: 'Markdown' })
+  messages.forEach(async message => {
+    await telegram.sendMessage(chatId, `*${message.subject}*\n\n${message.body}${message.attachments ? '\n\n(прикреплены файлы, но бот так пока не умеет 😕)' : ''}`, { parse_mode: 'Markdown' })
   })
+  await (telegram as any).setChatDescription(chatId, `Последнее обновление: ${moment().format('lll')}`)
 })().catch(console.error)
