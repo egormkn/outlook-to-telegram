@@ -12,6 +12,7 @@ import { MailFolder, Message, User } from '@microsoft/microsoft-graph-types'
 import { Client } from '@microsoft/microsoft-graph-client'
 import { Agent } from 'https'
 import Conf from 'conf'
+import notifier from 'node-notifier'
 
 dotenv.config()
 
@@ -135,4 +136,4 @@ const app: AppData = {
     await telegram.sendMessage(chatId, `*${message.subject}*\n\n${message.body}${message.attachments ? '\n\n(прикреплены файлы, но бот так пока не умеет 😕)' : ''}`, { parse_mode: 'Markdown' })
   })
   await (telegram as any).setChatDescription(chatId, `Последнее обновление: ${moment().format('lll')}`)
-})().catch(console.error)
+})().catch(notifier.notify)
