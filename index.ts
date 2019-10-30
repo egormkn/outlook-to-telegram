@@ -92,7 +92,7 @@ const app: AppData = {
   } =
     await client.api(link).get()
 
-  console.debug(mail.value)
+  console.debug(JSON.stringify(mail.value, undefined, 2))
 
   if (mail['@odata.deltaLink']) {
     config.set('deltaLink', mail['@odata.deltaLink'])
