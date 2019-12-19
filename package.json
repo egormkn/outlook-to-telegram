@@ -36,7 +36,7 @@
     "@types/html-to-text": "^1.4.31",
     "@types/inquirer": "^6.5.0",
     "@types/node-notifier": "^5.4.0",
-    "@types/qs": "^6.5.3",
+    "@types/qs": "^6.9.0",
     "@types/turndown": "^5.0.0",
     "@typescript-eslint/eslint-plugin": "^2.5.0",
     "@typescript-eslint/parser": "^2.5.0",
