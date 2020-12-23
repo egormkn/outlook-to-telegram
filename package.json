@@ -17,7 +17,7 @@
   "license": "MIT",
   "dependencies": {
     "@microsoft/microsoft-graph-client": "^2.0.0",
-    "axios": "^0.19.0",
+    "axios": "^0.21.1",
     "conf": "^6.2.0",
     "dotenv": "^8.2.0",
     "es6-promise": "^4.2.8",
